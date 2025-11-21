@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using TMPro;
 using UnityEngine.SceneManagement;
+using System.Collections; // Ya incluida, ¡perfecto!
 
 public class PlayerController : MonoBehaviour
 {
@@ -14,7 +15,8 @@ public class PlayerController : MonoBehaviour
     private bool isGrounded; 
     public TextMeshProUGUI countText;
     public GameObject winTextObject;
-    public GameObject restartPanel;
+    public GameObject restartPanel; // Debe ser asignado al panel de "Volver a Intentar / Salir"
+    public string nextSceneName = "escenario2"; // Asegúrate de que este nombre sea exacto
 
     void Start()
     {
@@ -25,10 +27,13 @@ public class PlayerController : MonoBehaviour
         isGrounded = true; 
         if (restartPanel != null)
         {
-            restartPanel.SetActive(false);
+            // Oculta el panel de reinicio al inicio
+            restartPanel.SetActive(false); 
         }
     }
     
+    // ... (OnMove, OnJump, FixedUpdate, OnTriggerEnter sin cambios) ...
+
     void OnMove(InputValue movementValue)
     {
         Vector2 movementVector = movementValue.Get<Vector2>();
@@ -68,14 +73,17 @@ public class PlayerController : MonoBehaviour
         if (count >= 12)
         {
             winTextObject.SetActive(true);
-            winTextObject.GetComponent<TextMeshProUGUI>().text = "¡GANASTE!";
+            winTextObject.GetComponent<TextMeshProUGUI>().text = "¡GANASTE! Siguiente mapa en 3s ";
             
-            if (restartPanel != null)
+            // 1. Destruye el enemigo inmediatamente.
+            GameObject enemy = GameObject.FindGameObjectWithTag("Enemy");
+            if (enemy != null)
             {
-                restartPanel.SetActive(true);
+                Destroy(enemy);
             }
 
-            Destroy(GameObject.FindGameObjectWithTag("Enemy"));
+            // 2. Comienza la corrutina para esperar y cargar la siguiente escena.
+            StartCoroutine(LoadNextLevelAfterDelay(3f)); // Espera 3 segundos
         }
     }
 
@@ -83,16 +91,19 @@ public class PlayerController : MonoBehaviour
     {
         if (collision.gameObject.CompareTag("Enemy"))
         {
-            Destroy(gameObject); 
+            //Destroy(gameObject); // El jugador muere
             winTextObject.gameObject.SetActive(true);
             winTextObject.GetComponent<TextMeshProUGUI>().text = "¡PERDISTE!";
             
+            // ACTIVA el panel del menú de "Volver a intentar / Salir"
             if (restartPanel != null)
             {
                 restartPanel.SetActive(true);
             }
         }
     }
+    
+    // ... (OnCollisionStay, OnCollisionExit sin cambios) ...
 
     private void OnCollisionStay(Collision collision)
     {
@@ -107,8 +118,33 @@ public class PlayerController : MonoBehaviour
     }
 
     public void RestartGame()
-       {
-       SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-       
+    {
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+    }
+
+    IEnumerator LoadNextLevelAfterDelay(float delay)
+    {
+        // Detiene el movimiento del jugador mientras espera
+        rb.linearVelocity = Vector3.zero; // Corregido: usando rb.velocity
+        rb.angularVelocity = Vector3.zero;
+
+        // Espera el tiempo especificado
+        yield return new WaitForSeconds(delay);
+
+        // Carga la siguiente escena usando el nombre definido
+        SceneManager.LoadScene(nextSceneName);
+    }
+    
+    // Función para salir del juego
+    public void QuitGame()
+    {
+        Debug.Log("Saliendo del Juego...");
+        
+        Application.Quit();
+
+        #if UNITY_EDITOR
+            // Esto es solo para detener el juego en el editor de Unity.
+            UnityEditor.EditorApplication.isPlaying = false;
+        #endif
     }
 }
